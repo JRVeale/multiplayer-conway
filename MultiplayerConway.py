@@ -72,21 +72,20 @@ def evolve_cell(team, neighbours, ruleset):
         else:
             # Reproduction?
             for key in neighbours:
-                if neighbours[key] > 3:
+                if neighbours[key] > 3 and key != 0:
                     # Too crowded for any team to reproduce
                     return 0
 
             for key in neighbours:
-                if neighbours[key] == 3:
+                if neighbours[key] == 3 and key != 0:
                     # Can reproduce unless competition
                     for other_team in neighbours:
                         if neighbours[other_team] == 3:
                             if other_team != key and other_team != 0:
                                 return 0
                     return key
-                else:
-                    # Not enough to reproduce
-                    return 0
+            # not enough neighbours of any individual team
+            return 0
 
     elif ruleset == "wretched_violence":
         majority = team
@@ -185,15 +184,11 @@ def size_segment_grid(x, y, teams):
 
 
 def arrange_around_edge(grid, list_of_items):
-    print("ARRANGE_AROUND_EDGE")
-
     x_segs = len(grid)
     y_segs = len(grid[0])
 
     if len(list_of_items) > 2 * (x_segs + y_segs) - 4:
         raise Exception("list_of_items too long for grid")
-
-    print("x_segs is " + str(x_segs) + " and y_segs is " + str(y_segs))
 
     mode = "inc_y"
     x = 0
@@ -201,7 +196,6 @@ def arrange_around_edge(grid, list_of_items):
 
     for i in list_of_items:
         # place item
-        print("x is " + str(x) + " and y is " + str(y))
         grid[x][y] = i
 
         # see if mode needs changing
@@ -224,12 +218,6 @@ def arrange_around_edge(grid, list_of_items):
         else:
             raise Exception("broken arrange_around_edge")
 
-    print("grid of segments output is:")
-    for g in grid:
-        for r in g:
-            print(r)
-        print()
-
     return grid
 
 
@@ -246,13 +234,10 @@ def replace_list_subset(list, subset, index):
 
 
 def arrange_segments(x, y, mini_grids, teams):
-    print("ARRANGE_SEGMENTS")
     xt = len(mini_grids[0])
     yt = len(mini_grids[0][0])
-    print("xt, yt: " + str((xt, yt)))
     x_segments = floor(x / xt)
     y_segments = floor(y / yt)
-    print("x_segments, y_segments: " + str((x_segments,y_segments)))
     total_segments = 2 * (x_segments + y_segments) - 4
 
     segments_around_edge = []  # segments in clockwise order around edge
@@ -260,32 +245,18 @@ def arrange_segments(x, y, mini_grids, teams):
     if total_segments != teams:
         # there are some empty segments that need inserting into mini_grids
         # insert the empty segments equally around the edges
-        print("more possible segments than teams")
         empty_segments = total_segments - teams
         empty_segment_spacing = floor(total_segments/empty_segments)
         current_team = 0
         for s in range(1, total_segments + 1):
-            print("s: " + str(s))
             if s % (empty_segment_spacing+1) == 0 or current_team >= teams:
                 # multiple of empty_segment_spacing, place empty segment
                 segments_around_edge.append(make_empty_grid(xt, yt))
-                print("added empty spot")
             else:
                 segments_around_edge.append(mini_grids[current_team])
                 current_team += 1
-                print("mini_grids[current_team]: ")
-                for r in mini_grids[current_team-1]:
-                    print(r)
-                print("added next team")
     else:
-        print("no empty (middle) segments")
         segments_around_edge = mini_grids
-
-    print("segments around edge:")
-    for g in segments_around_edge:
-        for r in g:
-            print(r)
-        print()
 
     # make empty grid of grids
     grid_of_segments = []
@@ -295,11 +266,6 @@ def arrange_segments(x, y, mini_grids, teams):
             row.append(make_empty_grid(xt, yt))
         grid_of_segments.append(row)
 
-    print("grid of empty segments is:")
-    for s in grid_of_segments:
-        for r in s:
-            print(r)
-        print()
     # arrange segments on empty grid of grids
     grid_of_segments = arrange_around_edge(grid_of_segments,
                                            segments_around_edge)
@@ -325,11 +291,6 @@ def make_segmented_grid(x, y, teams, emptiness):
     for t in range(teams):
         mini_grids.append(make_random_grid(xt, yt, 1, emptiness,
                                            first_team=t + 1))
-    print("mini_grids are:")
-    for g in mini_grids:
-        for r in g:
-            print(r)
-        print()
     return arrange_segments(x, y, mini_grids, teams)
 
 
@@ -463,9 +424,23 @@ def play_game(screen_size=(600, 600),
 
 
 def main():
-    play_game(ruleset="cooperation", setup="segmented", emptiness=4, teams=4,
-              rounds_per_second=20, rounds=50,
-              screen_size=(1200, 800), field_size=(80, 80))
+    '''test_grid = [
+        [1, 0, 1],
+        [0, 0, 0],
+        [1, 0, 0]
+    ]
+    for r in test_grid:
+        print(r)
+    neighbours = count_neighbours(test_grid, (1, 1))
+    print()
+    test_grid = evolve(test_grid, "ignorance")
+    for r in test_grid:
+        print(r)'''
+
+    play_game(ruleset="cooperation", setup="segmented", emptiness=4, teams=20,
+              rounds_per_second=60, rounds=600,
+              screen_size=(1200, 800), field_size=(60, 60))
+
 
 if __name__ == '__main__':
     main()
