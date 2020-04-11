@@ -424,18 +424,6 @@ def play_game(screen_size=(600, 600),
 
 
 def main():
-    '''test_grid = [
-        [1, 0, 1],
-        [0, 0, 0],
-        [1, 0, 0]
-    ]
-    for r in test_grid:
-        print(r)
-    neighbours = count_neighbours(test_grid, (1, 1))
-    print()
-    test_grid = evolve(test_grid, "ignorance")
-    for r in test_grid:
-        print(r)'''
 
     play_game(ruleset="cooperation", setup="segmented", emptiness=4, teams=20,
               rounds_per_second=60, rounds=600,
