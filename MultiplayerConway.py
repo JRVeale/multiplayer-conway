@@ -336,6 +336,13 @@ def draw_block(screen, x, y, size, alive_colour):
     pygame.draw.rect(screen, alive_colour, rect)
 
 
+def draw_outline(screen, xlen, ylen, size, colour, thickness = 1):
+    x_size = xlen * size
+    y_size = ylen * size
+    rect = pygame.Rect(0, 0, x_size, y_size)
+    pygame.draw.rect(screen, colour, rect, thickness)
+
+
 def shift_colour(colour,
                  hue_multiplier=1.0, sat_multiplier=1.0, val_multiplier=1.0,
                  alpha_multiplier=1.0,):
@@ -372,12 +379,26 @@ def generate_team_colours(teams):
     return team_colours
 
 
-def render(screen, xlen, ylen, world, team_colours, block_size):
+def screen_pos_to_world_pos(screen_pos, world, size):
+    x_pos, y_pos = screen_pos
+    x_size = len(world) * size
+    y_size = len(world[0]) * size
+    if x_pos < 0 or x_pos >= x_size or y_pos < 0 or y_pos >= y_size:
+        # screen_pos is outside of field
+        return -1, -1
+    else:
+        return floor(x_pos/size), floor(y_pos/size)
+
+
+def render(screen, xlen, ylen, world, team_colours, block_size, outline):
     for x in range(xlen):
         for y in range(ylen):
             team = world[x][y]
             cell_colour = team_colours[team]
             draw_block(screen, x, y, block_size, cell_colour)
+    outline_draw, outline_colour = outline
+    if outline_draw:
+        draw_outline(screen, x, y, block_size, outline_colour)
     pygame.display.flip()
 
 
@@ -396,21 +417,57 @@ def play_game(screen_size=(600, 600),
 
     team_colours = generate_team_colours(teams)
 
+    outline = (False, pygame.Color(0,0,0))
+
     # generate and show random start
     if setup == "random":
         world = make_random_grid(xlen, ylen, teams=teams, emptiness=emptiness)
+        outline = (True, pygame.Color(133,255,4))
     elif setup == "segmented":
         world = make_segmented_grid(xlen, ylen, teams=teams,
                                     emptiness=emptiness)
+    elif setup.startswith("place_cells"):
+        cells_each = int(setup[11:])
+        if cells_each < 3:
+            raise Exception("too few cells")
+
+        # start with empty world, and let players click to add a cell
+        world = make_empty_grid(xlen, ylen)
+
+        for cell in range(cells_each):
+            for t in range(1, teams + 1):
+                # show outline to show whose turn it is
+                outline = (True, team_colours[t])
+                render(screen, xlen, ylen, world, team_colours, block_size,
+                       outline)
+                # wait for input
+                input_received = False
+                while not input_received:
+                    events = pygame.event.get()
+                    for e in events:
+                        if e.type == pygame.MOUSEBUTTONUP:
+                            # mouse clicked
+                            screen_pos = pygame.mouse.get_pos()
+                            world_pos = screen_pos_to_world_pos(screen_pos,
+                                                                world,
+                                                                block_size)
+                            world_x, world_y = world_pos
+                            if world_x != -1 or world_y != -1:
+                                if world[world_x][world_y] == 0:
+                                    world[world_x][world_y] = t
+                                    input_received = True
+                # next team
+            # next cell
+        # placed all cells, begin
     else:
         raise Exception("Unrecognised setup")
-    render(screen, xlen, ylen, world, team_colours, block_size)
+    render(screen, xlen, ylen, world, team_colours, block_size, outline)
     sleep(1)
 
     # for each round
     for i in range(rounds):
         # render current round
-        render(screen, xlen, ylen, world, team_colours, block_size)
+        render(screen, xlen, ylen, world, team_colours, block_size, outline)
 
         # calc next round
         world = evolve(world, ruleset)
@@ -425,9 +482,9 @@ def play_game(screen_size=(600, 600),
 
 def main():
 
-    play_game(ruleset="cooperation", setup="segmented", emptiness=4, teams=20,
+    play_game(ruleset="cooperation", setup="place_cells20", emptiness=4, teams=2,
               rounds_per_second=60, rounds=600,
-              screen_size=(1200, 800), field_size=(60, 60))
+              screen_size=(1200, 800), field_size=(30, 60))
 
 
 if __name__ == '__main__':
