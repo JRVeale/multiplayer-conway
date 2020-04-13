@@ -1,8 +1,10 @@
 # NEXT
-# Add sectored random start
+# Add zoned player place_cell start - requires knowing where each player's zone
+# is, and we haven't kept that info from the segment generator - mi
 #
-# Add setup phase where players take turns to place a single starting cell in
-# their zone / a few cells at a time / set shapes of cells at a time
+# Add place saved setpieces - probably worth rewriting with numpy array's and
+# convolution instead of
+
 
 # TODOs:
 #
@@ -13,7 +15,11 @@
 #
 # Make more performant
 #
-# OOPify
+# OOPify - REALLY do it, fiddling with features is fun, but it's a lot smoother
+# if done properly.
+# Also use pygame properly (not just for rendering. Separate render loop from
+# game logic loop (as if you were doing this properly in a real language)
+# ACTUALLY, consider doing this in Unity rather, it'd be fun?
 # Use enums instead of strings for modes
 #
 # Able to save a seed and rerun
@@ -336,10 +342,13 @@ def draw_block(screen, x, y, size, alive_colour):
     pygame.draw.rect(screen, alive_colour, rect)
 
 
-def draw_outline(screen, xlen, ylen, size, colour, thickness = 1):
-    x_size = xlen * size
-    y_size = ylen * size
-    rect = pygame.Rect(0, 0, x_size, y_size)
+def draw_outline(screen, pos, size, world_size, colour, thickness = 1):
+    xlen, ylen = size
+    x_size = xlen * world_size
+    y_size = ylen * world_size
+    x, y = pos
+    rect = pygame.Rect(x, y, int(x_size), int(y_size))
+
     pygame.draw.rect(screen, colour, rect, thickness)
 
 
@@ -390,21 +399,27 @@ def screen_pos_to_world_pos(screen_pos, world, size):
         return floor(x_pos/size), floor(y_pos/size)
 
 
-def render(screen, xlen, ylen, world, team_colours, block_size, outline):
+def render(screen, xlen, ylen, world, team_colours, block_size,
+           outline, cursor):
     for x in range(xlen):
         for y in range(ylen):
             team = world[x][y]
             cell_colour = team_colours[team]
             draw_block(screen, x, y, block_size, cell_colour)
-    outline_draw, outline_colour = outline
+    outline_draw, outline_colour, outline_pos, outline_size = outline
     if outline_draw:
-        draw_outline(screen, x, y, block_size, outline_colour)
+        draw_outline(screen, outline_pos, outline_size, block_size, outline_colour)
+    cursor_draw, cursor_colour, cursor_pos = cursor
+    if cursor_draw:
+        cursor_x, cursor_y = cursor_pos
+        draw_block(screen, cursor_x, cursor_y, block_size, cursor_colour)
     pygame.display.flip()
 
 
 def play_game(screen_size=(600, 600),
               field_size=(60, 60), rounds=200, teams=4, emptiness=4,
               ruleset="cooperation", setup="random",
+              placing_turns=0, cells_per_placing_turn=1,
               rounds_per_second=5, ):
 
     # setup
@@ -417,57 +432,64 @@ def play_game(screen_size=(600, 600),
 
     team_colours = generate_team_colours(teams)
 
-    outline = (False, pygame.Color(0,0,0))
+    outline = (False, pygame.Color(0,0,0), (-1, -1), (-1, -1))
+    cursor = (False, pygame.Color(0,0,0), (-1, -1))
 
     # generate and show random start
     if setup == "random":
         world = make_random_grid(xlen, ylen, teams=teams, emptiness=emptiness)
-        outline = (True, pygame.Color(133,255,4))
     elif setup == "segmented":
         world = make_segmented_grid(xlen, ylen, teams=teams,
                                     emptiness=emptiness)
-    elif setup.startswith("place_cells"):
-        cells_each = int(setup[11:])
-        if cells_each < 3:
-            raise Exception("too few cells")
+    elif setup == "place_cells" or "segmented_place_cells":
+        if placing_turns < 1:
+            raise Exception("too few turns")
+        if cells_per_placing_turn < 1:
+            raise Exception("too few cells_per_turn")
 
         # start with empty world, and let players click to add a cell
         world = make_empty_grid(xlen, ylen)
 
-        for cell in range(cells_each):
+        for turn in range(placing_turns):
             for t in range(1, teams + 1):
-                # show outline to show whose turn it is
-                outline = (True, team_colours[t])
-                render(screen, xlen, ylen, world, team_colours, block_size,
-                       outline)
-                # wait for input
-                input_received = False
-                while not input_received:
-                    events = pygame.event.get()
-                    for e in events:
-                        if e.type == pygame.MOUSEBUTTONUP:
-                            # mouse clicked
-                            screen_pos = pygame.mouse.get_pos()
-                            world_pos = screen_pos_to_world_pos(screen_pos,
-                                                                world,
-                                                                block_size)
-                            world_x, world_y = world_pos
-                            if world_x != -1 or world_y != -1:
-                                if world[world_x][world_y] == 0:
-                                    world[world_x][world_y] = t
-                                    input_received = True
-                # next team
-            # next cell
-        # placed all cells, begin
+                for turn_cell in range(cells_per_placing_turn):
+                    # show outline to show whose turn it is
+                    outline = (True, team_colours[t], (0,0), (xlen, ylen))
+                    render(screen, xlen, ylen, world, team_colours, block_size,
+                           outline, cursor)
+                    # wait for input
+                    input_received = False
+                    while not input_received:
+                        screen_pos = pygame.mouse.get_pos()
+                        world_pos = screen_pos_to_world_pos(screen_pos,
+                                                            world,
+                                                            block_size)
+                        cursor = (True,
+                                  shift_colour(team_colours[t],
+                                               alpha_multiplier=.4),
+                                  world_pos)
+                        render(screen, xlen, ylen, world, team_colours, block_size,
+                               outline, cursor)
+                        events = pygame.event.get()
+                        for e in events:
+                            if e.type == pygame.MOUSEBUTTONUP:
+                                # mouse clicked
+                                world_x, world_y = world_pos
+                                if world_x != -1 or world_y != -1:
+                                    if world[world_x][world_y] == 0:
+                                        input_received = True
+                                        world[world_x][world_y] = t
+
+
     else:
         raise Exception("Unrecognised setup")
-    render(screen, xlen, ylen, world, team_colours, block_size, outline)
+    render(screen, xlen, ylen, world, team_colours, block_size, outline, cursor)
     sleep(1)
 
     # for each round
     for i in range(rounds):
         # render current round
-        render(screen, xlen, ylen, world, team_colours, block_size, outline)
+        render(screen, xlen, ylen, world, team_colours, block_size, outline, cursor)
 
         # calc next round
         world = evolve(world, ruleset)
@@ -482,9 +504,10 @@ def play_game(screen_size=(600, 600),
 
 def main():
 
-    play_game(ruleset="cooperation", setup="place_cells20", emptiness=4, teams=2,
+    play_game(ruleset="cooperation", setup="place_cells", emptiness=4, teams=2,
               rounds_per_second=60, rounds=600,
-              screen_size=(1200, 800), field_size=(30, 60))
+              placing_turns=10, cells_per_placing_turn=2,
+              screen_size=(1200, 800), field_size=(50, 40))
 
 
 if __name__ == '__main__':
