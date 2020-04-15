@@ -29,8 +29,8 @@ class Screen:
     def draw_block(self, pos, colour):
         block_size = floor(self.scaling * 0.8)
         x, y = pos
-        x *= int(self.scaling)
-        y *= int(self.scaling)
+        x = int((x + 0.1) * self.scaling)
+        y = int((y + 0.1) * self.scaling)
         rect = pygame.Rect(x, y, block_size, block_size)
         pygame.draw.rect(self.screen, colour, rect)
 
@@ -45,4 +45,6 @@ class Screen:
         pygame.draw.rect(self.screen, colour, rect, thickness)
 
     def flip(self):
-        pygame.display.flip()
+        pygame.display.update()
+        # reset screen for next draw
+        self.screen.fill(pygame.Color(0, 0, 0))

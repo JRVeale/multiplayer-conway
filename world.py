@@ -3,6 +3,7 @@ from math import floor
 from colours import Colours
 from time import monotonic
 from rendering import Screen
+import pygame
 
 class World:
     """The world upon which the Game of Life occurs"""
@@ -102,3 +103,40 @@ class World:
         for t in range(teams):
             team_grid += (world_array[:,:,t] * (t+1))
         return team_grid
+
+
+class Cursor:
+    def __init__(self, style=0):
+        self.pos = None
+        self.colour = None
+        self.active = False
+        self.style = style
+
+    def update(self, screen_pos, scaling):
+        if self.active:
+            x, y = screen_pos
+            print("mouse_pos: ")
+            print((x, y))
+            x = floor(x / scaling)
+            y = floor(y / scaling)
+            print((x, y))
+            self.pos = (x, y)
+
+    def set_team(self, team, colours):
+        self.colour = colours.shift_colour(colours.get_team_colour(team),
+                                           alpha_multiplier=0.4)
+
+    def hide(self):
+        self.active = False
+
+    def show(self):
+        self.active = True
+
+    def render(self, screen):
+        if self.pos is not None and self.colour is not None and self.active:
+            if self.style == 1:
+                screen.draw_outline(self.pos, (1.0, 1.0), self.colour,
+                                    thickness=4)
+            else:
+                screen.draw_block(self.pos, self.colour)
+

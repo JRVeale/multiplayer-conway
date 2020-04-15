@@ -1,8 +1,9 @@
 import numpy as np
 from enum import Enum
 from time import sleep, monotonic
+import pygame
 
-from world import World
+from world import World, Cursor
 from setup import *
 from rules import *
 from settings import *
@@ -10,7 +11,6 @@ from rendering import Screen
 
 # TODO: Stop game if finished
 # TODO: Scoring system
-# TODO: Render cursor
 
 
 class Game:
@@ -26,6 +26,7 @@ class Game:
         self.settings = None
         self.screen = Screen(settings.res)
         self.change_settings(settings)
+        self.cursor = Cursor()
 
     def change_settings(self, settings):
         self.settings = settings
@@ -33,8 +34,10 @@ class Game:
 
     def update(self):
         # game logic here (setup, running, end, etc)
-
         if self.state == Game.State.SETUP:
+            self.cursor.set_team(1, self.world.team_colours)
+            self.cursor.show()
+
             if self.world.setup.needs_user_input:
                 # run through the substates of events to do this setup
                 raise NotImplementedError()
@@ -48,6 +51,7 @@ class Game:
                 print("Finished setup")
                 self.state = Game.State.PLAYING
                 self.world.setup.finished = False
+                self.cursor.hide()
                 self.render()
                 sleep(2.0)  # pause with view of startup
                 print("Starting game")
@@ -63,24 +67,32 @@ class Game:
         elif self.state == Game.State.END:
             pass
 
-        self.render()
+    def get_inputs(self):
+        self.cursor.update(pygame.mouse.get_pos(), self.screen.scaling)
+        for event in pygame.event.get():
+            # must clear events for mouse to update
+            # deal with mouse presses and stuff here
+            pass
 
     def render(self):
         self.world.render(self.screen)
+        self.cursor.render(self.screen)
 
         for g in self.graphics:
             g.render()
+            # TODO: Try this, and see if passing by reference when adding item
+            #  to graphics list
 
         self.screen.flip()
 
 
 if __name__ == "__main__":
     res = 1000, 1000
-    game_tick_wait = 1000.0 * 1.0 / 100.0
+    game_tick_wait = 1000.0 * 1.0 / 10.0
     settings = Settings(res, game_tick_wait)
     game = Game(settings)
     rules = Rules.create(Rules.Name.COOPERATION)
-    world_size = (500, 500)
+    world_size = (20, 20)
     teams = 4
     setup = Setup.create(world_size, teams,
                          Setup.Names.RANDOM, Setup.Segmented.NONE)
@@ -89,4 +101,6 @@ if __name__ == "__main__":
 
     while True:
         game.update()
+        game.get_inputs()
+        game.render()
 
