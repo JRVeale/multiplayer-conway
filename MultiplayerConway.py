@@ -28,6 +28,14 @@ class Game:
         self.change_settings(settings)
         self.cursor = Cursor()
 
+        self.current_team = 1
+
+        # flags
+        self.left_click = False
+
+    def clear_input_flags(self):
+        self.left_click = False
+
     def change_settings(self, settings):
         self.settings = settings
         self.screen.change_res(settings.res)
@@ -35,18 +43,29 @@ class Game:
     def update(self):
         # game logic here (setup, running, end, etc)
         if self.state == Game.State.SETUP:
-            self.cursor.set_team(1, self.world.team_colours)
+            self.cursor.set_team(self.current_team, self.world.team_colours)
             self.cursor.show()
 
             if self.world.setup.needs_user_input:
-                # run through the substates of events to do this setup
-                raise NotImplementedError()
+                if self.left_click:
+                    if self.world.is_cell_alive(self.cursor.pos):
+                        # cell is already alive, don't update
+                        pass
+                    else:
+                        # place cell
+                        self.world.set(self.world.setup.place_cells(
+                                                self.world.array,
+                                                self.current_team,
+                                                self.cursor.pos))
+                        if self.current_team == self.world.setup.teams:
+                            self.current_team = 1
+                        else:
+                            self.current_team += 1
             else:
                 # no user input, just set it up!
                 self.world.set(self.world.setup.place_cells())
-                self.world.setup.finished = True
 
-            if self.world.setup.finished:
+            if self.world.setup.setup_complete():
                 # move to PLAYING stage, and reset setup.finished
                 print("Finished setup")
                 self.state = Game.State.PLAYING
@@ -67,12 +86,18 @@ class Game:
         elif self.state == Game.State.END:
             pass
 
+        # at end of update()
+        self.clear_input_flags()    # clear all inputs so aren't duplicated
+
     def get_inputs(self):
         self.cursor.update(pygame.mouse.get_pos(), self.screen.scaling)
         for event in pygame.event.get():
             # must clear events for mouse to update
             # deal with mouse presses and stuff here
-            pass
+            if event.type == pygame.MOUSEBUTTONUP:
+                if event.button == 1:
+                    self.left_click = True
+
 
     def render(self):
         self.world.render(self.screen)
@@ -94,8 +119,13 @@ if __name__ == "__main__":
     rules = Rules.create(Rules.Name.COOPERATION)
     world_size = (20, 20)
     teams = 4
+    #setup = Setup.create(world_size, teams,
+    #                     Setup.Names.RANDOM, Setup.Segmented.NONE)
+    starting_cells_per_team = 15
     setup = Setup.create(world_size, teams,
-                         Setup.Names.RANDOM, Setup.Segmented.NONE)
+                         Setup.Names.PLACE_CELLS, Setup.Segmented.NONE,
+                         )
+    #                     num_cells_each=starting_cells_per_team)
     game.world = World(setup, rules)
     game.screen.update_scaling(game.world)
 

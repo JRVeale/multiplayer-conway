@@ -5,6 +5,7 @@ from time import monotonic
 from rendering import Screen
 import pygame
 
+
 class World:
     """The world upon which the Game of Life occurs"""
     # instance variables
@@ -22,7 +23,6 @@ class World:
         if self.enough_time_since_last_evolution(game_tick_wait):
             self.evolve()
             self.set_last_evolution_millis()
-
 
     def time_since_last_evolution(self):
         return monotonic() * 1000 - self.last_world_update_millis
@@ -62,13 +62,69 @@ class World:
 
     def create_empty_world_array(self, world_size, teams):
         world_x, world_y = world_size
-        self.array = np.zeros((world_x, world_y, teams))
+        self.array = np.zeros((world_x, world_y, teams), dtype=int)
 
     def set(self, new_array):
         self.array = new_array
 
     def get_team_colour(self, team):
         return self.team_colours.get_team_colour(team)
+
+    def size_segment_grid(self, use_corners=True):
+        # Get relevant info
+        world_x, world_y = self.array.shape
+        teams = self.setup.teams
+        if use_corners:
+            required_segments = teams
+        else:
+            required_segments = teams + 4
+
+        # Begin with an approximation, will either be correct or be just above
+        # the largest square number that is too small
+        segment_x_guess = floor(4 * world_x / (required_segments + 4))
+        segment_y_guess = floor(4 * world_y / (required_segments + 4))
+
+        segments_in_x = floor(world_x / segment_x_guess)
+        segments_in_y = floor(world_y / segment_y_guess)
+
+        # add extra segments (by making segment sizes more square where
+        # possible) until there are enough segments for all the teams
+        while 2 * (segments_in_x + segments_in_y - 2) < required_segments:
+            # not enough segments, so divide the larger edge further
+            if segment_x_guess > segment_y_guess:
+                segments_in_x += 1
+            else:
+                segments_in_y += 1
+
+        # now that number of segments is set well (filling around edge as best
+        # as possible, matching the aspect ratio of the world pretty closely),
+        # return recalculated segment size
+        return floor(world_x / segments_in_x), floor(world_x / segments_in_y),\
+               teams
+
+    def is_cell_alive(self, position):
+        x, y = position
+        for team in range(self.setup.teams):
+            if self.array[x, y, team-1] == 1:
+                return True
+
+        return False
+
+    @staticmethod
+    def replace_array_subset(array, subset, index):
+        # TODO: raise Exception if array, subset, index have dif num dimensions
+        index_other_end = np.empty(index.shape)
+        # for each dimension of the arrays
+        for ii in range(len(array.shape)):
+            if index[ii] < 0 or index[ii] >= array[ii]:
+                raise IndexError("Index out of bounds")
+            if index[ii] + subset.shape[ii] > array.shape[ii]:
+                raise ValueError("Subset too large for list at this index")
+            index_other_end[ii] = index[ii] + index.shape[ii]
+
+        # TODO: LEFT UNFINISHED?
+        np.put(array, )
+
 
     @staticmethod
     def make_random_grid(size, teams, emptiness=1.0, first_team=1):
@@ -81,6 +137,17 @@ class World:
     @staticmethod
     def make_empty_grid(size):
         return np.zeros(size)
+
+    @staticmethod
+    def change_cell_team(world_array, position, team):
+        x, y = position
+        teams = world_array.shape[2]
+        for t in range(teams):
+            if t == team - 1:
+                world_array[x, y, t] = 1
+            else:
+                world_array[x, y, t] = 0
+        return world_array
 
     @staticmethod
     def world_array_from_team_grid(team_grid):
@@ -115,11 +182,8 @@ class Cursor:
     def update(self, screen_pos, scaling):
         if self.active:
             x, y = screen_pos
-            print("mouse_pos: ")
-            print((x, y))
             x = floor(x / scaling)
             y = floor(y / scaling)
-            print((x, y))
             self.pos = (x, y)
 
     def set_team(self, team, colours):
@@ -139,4 +203,19 @@ class Cursor:
                                     thickness=4)
             else:
                 screen.draw_block(self.pos, self.colour)
+
+if __name__ == "__main__":
+    a = np.zeros((5, 5))
+    b = np.ones((3, 3, 3))
+    index = 1, 1
+
+    #positions = np.add([])  #add index to the position of every element in b, could I use arrange?
+    #np.put(a, positions, b)
+
+    #a[index[0]:(index[0] + b.shape[0]), index[1]: (index[1] + b.shape[1])] = b
+    print(b)
+
+    for team in range(1, 2 + 1):
+        if b[0, 0, team] == 1:
+            print("True")
 
